@@ -1,10 +1,16 @@
 # ~/.zshrc
 
+VENV_DIR=".venv"
+
+is_python_project() {
+    [[ -f "setup.py" ]] || [[ -f "requirements.txt" ]] || [[ -f "pyproject.toml" ]] || \
+    [[ -f "Pipfile" ]] || [[ -d "src" && -f "src/**/*.py"(N) ]] || [[ -f "*.py"(N) ]]
+}
+
 check_venv_ancestor() {
   local check_dir="$1"
   local venv_path="$VIRTUAL_ENV"
   
-  # If no virtual environment is active, return 1
   [[ -z "$venv_path" ]] && return 1
   
   while [[ "$check_dir" != "/" ]]; do
@@ -16,51 +22,70 @@ check_venv_ancestor() {
   return 1
 }
 
-# Define the function to handle virtual environment management
-auto_venv() {
-  # Define the path where the virtual environment should be created (e.g., .venv in the project root)
-  VENV_DIR=".venv"
+is_venv_active() {
+  [[ -n "$VIRTUAL_ENV" ]]
+}
 
-  # Deactivate any existing virtual environment if active
-  if [[ -n "$VIRTUAL_ENV" ]]; then
-    if ! check_venv_ancestor "$(pwd)"; then
-      echo "Deactivating virtual environment from $(dirname "$VIRTUAL_ENV")..."
-      deactivate
+install_deps() {
+  if is_venv_active; then  # Fixed function call
+    flag_file="$VIRTUAL_ENV/.requirements_installed"
+    if [[ -f $flag_file ]]; then
+      return
     fi
-  fi
 
-    # Check if a requirements.txt file exists
-  if [[ -f "requirements.txt" ]]; then
-    # If .venv does not exist, ask the user if they want to create it
-    if [[ ! -d "$VENV_DIR" ]]; then
-      read -q "REPLY?requirements.txt detected. Do you want to create a virtual environment in $VENV_DIR and install dependencies? (y/n) "
-      echo  # Newline after the prompt for better formatting
+    if [[ -f "requirements.txt" ]]; then
+      read -q "REPLY?requirements.txt detected. Do you want to install dependencies from requirements.txt? (y/n) "
+      echo
 
       if [[ "$REPLY" == "y" || "$REPLY" == "Y" ]]; then
-        echo "Creating virtual environment in $VENV_DIR..."
-        python3 -m venv "$VENV_DIR"
-        source "$VENV_DIR/bin/activate"
         echo "Installing dependencies from requirements.txt..."
         pip install -r requirements.txt
+        echo "done" > $flag_file
       else
-        echo "Skipping virtual environment creation."
+        echo "Skipping dependencies installation."
       fi
-    else
-      # If .venv exists, activate it
-      echo "Activating virtual environment in $VENV_DIR..."
-      source "$VENV_DIR/bin/activate"
     fi
-  elif [[ -d "$VENV_DIR" ]]; then
-    # If requirements.txt does not exist but .venv does, simply activate it
-    echo "Activating virtual environment in $VENV_DIR..."
-    source "$VENV_DIR/bin/activate"
   fi
 }
 
-# Automatically call auto_venv function on directory change
+create_venv() {
+  if [[ ! -d "$VENV_DIR" ]]; then
+    read -q "REPLY?Virtual Environment not found. Do you want to create a virtual environment in $VENV_DIR? (y/n) "
+    echo
+
+    if [[ "$REPLY" == "y" || "$REPLY" == "Y" ]]; then
+      echo "Creating virtual environment in $VENV_DIR..."
+      python3 -m venv "$VENV_DIR"
+    fi
+  fi
+}
+
+activate_venv() {
+  if [[ -d "$VENV_DIR" ]]; then
+    echo "Activating virtual environment in .venv..."
+    source $VENV_DIR/bin/activate
+    PYTHONPATH="$(pwd):$(pwd)/src:$(pwd)/tests:${PYTHONPATH:+:$PYTHONPATH}"
+  fi
+}
+
+deactivate_venv() {
+  if is_venv_active && ! check_venv_ancestor "$(pwd)"; then
+    echo "Deactivating virtual environment from $(dirname "$VIRTUAL_ENV")..."
+    deactivate
+    PYTHONPATH=""
+  fi
+}
+
+auto_venv() {
+  deactivate_venv
+  if is_python_project; then
+    create_venv
+    activate_venv
+    install_deps
+  fi
+}
+
 autoload -U add-zsh-hook
 add-zsh-hook chpwd auto_venv
 
-# Initialize auto_venv on startup if in a project directory
 auto_venv
-
