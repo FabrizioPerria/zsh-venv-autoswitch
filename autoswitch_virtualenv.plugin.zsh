@@ -3,8 +3,7 @@
 VENV_DIR=".venv"
 
 is_python_project() {
-    [[ -f "setup.py" ]] || [[ -f "requirements.txt" ]] || [[ -f "pyproject.toml" ]] || \
-    [[ -f "Pipfile" ]] || [[ -d "src" && -f "src/**/*.py"(N) ]] || [[ -f "*.py"(N) ]]
+  [[ -f "requirements.txt" ]] || [[ -d "src" && -f "src/**/*.py"(N) ]] || [[ -f "*.py"(N) ]]
 }
 
 check_venv_ancestor() {
