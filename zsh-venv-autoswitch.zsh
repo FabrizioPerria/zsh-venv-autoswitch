@@ -1,14 +1,32 @@
 # ~/.zshrc
 
+check_venv_ancestor() {
+  local check_dir="$1"
+  local venv_path="$VIRTUAL_ENV"
+  
+  # If no virtual environment is active, return 1
+  [[ -z "$venv_path" ]] && return 1
+  
+  while [[ "$check_dir" != "/" ]]; do
+    if [[ "$check_dir" == "$venv_path" ]]; then
+      return 0
+    fi
+    check_dir="$(dirname "$check_dir")"
+  done
+  return 1
+}
+
 # Define the function to handle virtual environment management
 auto_venv() {
   # Define the path where the virtual environment should be created (e.g., .venv in the project root)
   VENV_DIR=".venv"
 
   # Deactivate any existing virtual environment if active
-  if [[ -n "$VIRTUAL_ENV" && "$VIRTUAL_ENV" != "$(pwd)/$VENV_DIR" ]]; then
-    echo "Deactivating current virtual environment..."
-    deactivate  # Deactivate the current environment
+  if [[ -n "$VIRTUAL_ENV" ]]; then
+    if ! check_venv_ancestor "$(pwd)"; then
+      echo "Deactivating virtual environment from $(dirname "$VIRTUAL_ENV")..."
+      deactivate
+    fi
   fi
 
     # Check if a requirements.txt file exists
