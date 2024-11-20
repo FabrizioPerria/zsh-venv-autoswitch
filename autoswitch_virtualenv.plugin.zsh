@@ -64,7 +64,8 @@ activate_venv() {
   if [[ -d "$VENV_DIR" ]]; then
     echo "Activating virtual environment in .venv..."
     source $VENV_DIR/bin/activate
-    PYTHONPATH="$(pwd):$(pwd)/src:$(pwd)/tests:${PYTHONPATH:+:$PYTHONPATH}"
+    export PYTHONPATH="$(pwd):$(pwd)/src:$(pwd)/tests:${PYTHONPATH:+:$PYTHONPATH}"
+    export PYTHONPATH="$(find $VIRTUAL_ENV -type d -name "site-packages" -printf "%p:")$PYTHONPATH"
   fi
 }
 
@@ -72,7 +73,7 @@ deactivate_venv() {
   if is_venv_active && ! check_venv_ancestor "$(pwd)"; then
     echo "Deactivating virtual environment from $(dirname "$VIRTUAL_ENV")..."
     deactivate
-    PYTHONPATH=""
+    export PYTHONPATH=""
   fi
 }
 
