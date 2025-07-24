@@ -1,8 +1,10 @@
 # ~/.zshrc
 
 typeset -g VENV_DIR=".venv"
+typeset -g USE_POETRY=0
 
 is_python_project() {
+  [[ -f "pyproject.toml" ]] ||
   [[ -f "requirements.txt" ]] || 
   [[ -d "src" && -f "src/**/*.py"(N) ]] ||
   [[ -f "*.py"(N) ]]
@@ -48,6 +50,17 @@ install_deps() {
 
 create_venv() {
     local reply
+    if [[ -f pyproject.toml && -n $(grep '\[tool.poetry\]' pyproject.toml) ]]; then
+        USE_POETRY=1
+        if [[ -z $(poetry env info --path 2>/dev/null) ]]; then
+            read -q "reply?Create poetry virtual environment? [y/N] "
+            echo
+            [[ $reply != [yY] ]] && return 1
+            print "Creating poetry virtual environment..."
+            poetry env use python3 || return 1
+        fi
+        return 0
+    fi
 
     [[ -d $VENV_DIR ]] && return 0
     read -q "reply?Create virtual environment in ${VENV_DIR}? [y/N] "
@@ -59,13 +72,21 @@ create_venv() {
 }
 
 activate_venv() {
-    local site_packages_path
+    local site_packages_path venv_path
+    if [[ $USE_POETRY -eq 1 ]]; then
+        venv_path=$(poetry env info -p 2>/dev/null)
+        [[ -z $venv_path ]] && return 1
+        if [[ $VIRTUAL_ENV != $venv_path ]]; then
+            print "Activating poetry virtual environment..."
+            source "$venv_path/bin/activate" || return 1
+        fi
+    else
+        [[ $VIRTUAL_ENV == ${VENV_DIR:a} ]] && return 0
+        [[ ! -d $VENV_DIR ]] && return 1
 
-    [[ $VIRTUAL_ENV == ${VENV_DIR:a} ]] && return 0
-    [[ ! -d $VENV_DIR ]] && return 1
-
-    print "Activating virtual environment in ${VENV_DIR}..."
-    source $VENV_DIR/bin/activate || return 1
+        print "Activating virtual environment in ${VENV_DIR}..."
+        source $VENV_DIR/bin/activate || return 1
+    fi
 
     local paths=(
         $PWD
@@ -91,6 +112,7 @@ deactivate_venv() {
   print "Deactivating virtual environment from ${VIRTUAL_ENV:h}..."
   deactivate
   unset PYTHONPATH
+  USE_POETRY=0
 }
 
 auto_venv() {
