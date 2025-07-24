@@ -102,6 +102,21 @@ auto_venv() {
   fi
 }
 
+add-root-dir() {
+    is_venv_active || { print "No active virtual environment."; return 1; }
+
+    local dir reply site_packages project_pth
+    vared -p "Which directory do you want to add to this virtual environment? " dir
+    [[ -z $dir || ! -d $dir ]] && { print "Invalid directory."; return 1; }
+
+    site_packages=$(find "$VIRTUAL_ENV/lib" -type d -name "site-packages" -print -quit)
+    [[ -z $site_packages ]] && { print "Could not find site-packages directory."; return 1; }
+
+    project_pth="$site_packages/project.pth"
+    print -r -- "$dir" >> "$project_pth"
+    print "Added $dir to $project_pth"
+}
+
 autoload -U add-zsh-hook
 add-zsh-hook chpwd auto_venv
 
