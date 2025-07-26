@@ -73,6 +73,12 @@ create_venv() {
 
 activate_venv() {
     local site_packages_path venv_path
+
+    # neotest's python adapter looks for these files when discovering tests
+    if [[ ! -f pytest.ini && ! -f pyproject.toml && ! -f setup.cfg && ! -f mypy.ini && ! -f setup.py ]]; then
+        touch pytest.ini
+    fi
+
     if [[ $USE_POETRY -eq 1 ]]; then
         venv_path=$(poetry env info -p 2>/dev/null)
         [[ -z $venv_path ]] && return 1
