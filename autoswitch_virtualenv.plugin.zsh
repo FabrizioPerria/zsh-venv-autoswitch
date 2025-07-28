@@ -2,6 +2,7 @@
 
 typeset -g VENV_DIR=".venv"
 typeset -g USE_POETRY=0
+typeset -g CURRENT_VENV_ROOT=""
 
 is_python_project() {
   [[ -f "pyproject.toml" ]] ||
@@ -11,12 +12,13 @@ is_python_project() {
 }
 
 check_venv_ancestor() {
-    local check_dir=${1:a}  # :a flag expands to absolute path
-    local venv_dir=${VIRTUAL_ENV:a}
-    local project_dir=${venv_dir:h}  # :h removes last path component
+    current_dir="${1:-$PWD:a}"
+    echo $current_dir
+    echo $CURRENT_VENV_ROOT
 
-    [[ -z $venv_dir ]] && return 1
-    [[ $check_dir/ = $project_dir/* || $check_dir = $project_dir ]] && return 0
+    if [[ $current_dir == "$CURRENT_VENV_ROOT"/* || $current_dir == "$$CURRENT_VENV_ROOT" ]]; then
+        return 0
+    fi
     return 1
 }
 
@@ -79,12 +81,19 @@ activate_venv() {
         touch pytest.ini
     fi
 
+    local paths=(
+        $PWD
+        $PWD/src
+        $PWD/tests
+    )
+
     if [[ $USE_POETRY -eq 1 ]]; then
         venv_path=$(poetry env info -p 2>/dev/null)
         [[ -z $venv_path ]] && return 1
         if [[ $VIRTUAL_ENV != $venv_path ]]; then
             print "Activating poetry virtual environment..."
             source "$venv_path/bin/activate" || return 1
+            CURRENT_VENV_ROOT=${PWD:a}
         fi
     else
         [[ $VIRTUAL_ENV == ${VENV_DIR:a} ]] && return 0
@@ -92,23 +101,17 @@ activate_venv() {
 
         print "Activating virtual environment in ${VENV_DIR}..."
         source $VENV_DIR/bin/activate || return 1
+        CURRENT_VENV_ROOT=${PWD:a}
+
+        site_packages_path=$(find $VIRTUAL_ENV -type d -name "site-packages" -print -quit)
+        if [[ -n $site_packages_path ]]; then
+            paths=($site_packages_path $paths)
+        fi
     fi
 
-    local paths=(
-        $PWD
-        $PWD/src
-        $PWD/tests
-    )
-    
     if [[ -n $PYTHONPATH ]]; then
         paths+=("${(@s/:/)PYTHONPATH}")
     fi
-
-    site_packages_path=$(find $VIRTUAL_ENV -type d -name "site-packages" -print -quit)
-    if [[ -n $site_packages_path ]]; then
-        paths=($site_packages_path $paths)
-    fi
-
     export PYTHONPATH="${(j.:.)paths}"
 }
 
@@ -117,6 +120,7 @@ deactivate_venv() {
 
   print "Deactivating virtual environment from ${VIRTUAL_ENV:h}..."
   deactivate
+  unset CURRENT_VENV_ROOT
   unset PYTHONPATH
   USE_POETRY=0
 }
